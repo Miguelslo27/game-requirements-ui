@@ -48,7 +48,7 @@ export const getServerSideProps: GetServerSideProps<GameDetailsProps> = async ({
   }
   
   try {
-    const response = await axios.post(`${api}/games`, { slug: gameName });
+    const response = await axios.get(`${api}/games/${gameName}`);
     const videoGame = response?.data;
 
     return {

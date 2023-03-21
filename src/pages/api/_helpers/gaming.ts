@@ -1,8 +1,7 @@
-import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import cheerio from 'cheerio';
 
-const getClientCredentials = async () => {
+export const getClientCredentials = async () => {
   const clientId = process.env.TWITCH_CLIENT_ID;
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
   const grantType = 'client_credentials';
@@ -24,7 +23,29 @@ const getClientCredentials = async () => {
   }
 };
 
-const getGameData = async (slug: string, accessToken: string) => {
+export const getGames = async (accessToken: string) => {
+  const clientId = process.env.TWITCH_CLIENT_ID;
+  const config = {
+    headers: {
+      'Client-ID': clientId,
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'text/plain',
+    },
+  };
+  const api = 'https://api.igdb.com/v4';
+  const responseForGames = await axios.post(
+    `${api}/games`,
+    `
+      fields *;
+      limit 100;
+    `,
+    { ...config }
+  );
+  
+  return responseForGames.data;
+}
+
+export const getGameData = async (slug: string, accessToken: string) => {
   const clientId = process.env.TWITCH_CLIENT_ID;
   const config = {
     headers: {
@@ -42,7 +63,6 @@ const getGameData = async (slug: string, accessToken: string) => {
     { ...config }
   );
   const game = responseForGame.data[0];
-  // MULTI QUERY UP TO 10
   const responseForMultiQuery = await axios.post(
     `${api}/multiquery`,
     `
@@ -56,35 +76,35 @@ const getGameData = async (slug: string, accessToken: string) => {
       };
       query external_games "external_games" {
         fields *;
-        where id=(${game.external_games.join(',')});
+        where id=(${game.external_games?.join(',') || 0});
       };
       query game_modes "game_modes" {
         fields *;
-        where id=(${game.game_modes.join(',')});
+        where id=(${game.game_modes?.join(',') || 0});
       };
       query genres "genres" {
         fields *;
-        where id=(${game.genres.join(',')});
+        where id=(${game.genres?.join(',') || 0});
       };
       query platforms "platforms" {
         fields *;
-        where id=(${game.platforms.join(',')});
+        where id=(${game.platforms?.join(',') || 0});
       };
       query release_dates "release_dates" {
         fields *;
-        where id=(${game.release_dates.join(',')});
+        where id=(${game.release_dates?.join(',') || 0});
       };
       query screenshots "screenshots" {
         fields *;
-        where id=(${game.screenshots.join(',')});
+        where id=(${game.screenshots?.join(',') || 0});
       };
       query games "similar_games" {
         fields *;
-        where id=(${game.similar_games.join(',')});
+        where id=(${game.similar_games?.join(',') || 0});
       };
       query websites "websites" {
         fields *;
-        where id=(${game.websites.join(',')});
+        where id=(${game.websites?.join(',') || 0});
       };
     `,
     { ...config }
@@ -118,7 +138,7 @@ const getGameData = async (slug: string, accessToken: string) => {
       };
       query game_engines "game_engines" {
         fields *;
-        where platforms=(${game.platforms.join(',')});
+        where platforms=(${game.platforms?.join(',') || 0});
       };
     `,
     { ...config }
@@ -133,7 +153,13 @@ const getGameData = async (slug: string, accessToken: string) => {
   return game;
 };
 
-const getRequirements = async (game: any) => {
+export const getRequirements = async (game: any) => {
+  const websiteUrl = game.websites?.filter(
+    (web: any) => web.url?.includes('store.steampowered.com')
+  )[0]?.url;
+
+  if (!websiteUrl) return null;
+
   const websiteResponse = await axios.get(
     game.websites.filter((web: any) => web.url.includes('store.steampowered.com'))[0]
       .url
@@ -173,31 +199,3 @@ const getRequirements = async (game: any) => {
 
   return requirements;
 };
-
-const handler = async (req: NextApiRequest, res: NextApiResponse) => {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed.' });
-  }
-
-  const accessToken = await getClientCredentials();
-
-  console.log('ACCESS TOKEN', accessToken);
-
-  if (accessToken === null) {
-    return res.status(500).json({ message: 'Internal server error.' });
-  }
-
-  try {
-    const { slug } = req.body;
-    const game = await getGameData(slug, accessToken);
-    const requirements = await getRequirements(game);
-    game.requirements = requirements;
-
-    return res.status(200).json(game);
-  } catch (error) {
-    console.error('Error', error);
-    return res.status(500).json({ message: 'Internal server error.' });
-  }
-};
-
-export default handler;
