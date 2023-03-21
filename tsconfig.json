@@ -15,7 +15,8 @@
     "jsx": "preserve",
     "incremental": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@/helpers": ["./src/pages/api/_helpers"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
